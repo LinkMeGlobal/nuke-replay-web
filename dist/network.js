@@ -30,6 +30,17 @@ function safeHeaders(headers) {
 function excluded(url, configuration) {
     return [...DEFAULT_EXCLUSIONS, ...(configuration.network?.excludedUrlPatterns ?? [])].some((pattern) => pattern.test(url));
 }
+function diagnosticUrl(value) {
+    try {
+        const parsed = new URL(value, window.location.href);
+        parsed.search = "";
+        parsed.hash = "";
+        return parsed.toString();
+    }
+    catch {
+        return value.split(/[?#]/, 1)[0] ?? "";
+    }
+}
 async function readResponseBody(response, maximum) {
     const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
     if (!contentType.includes("json") && !contentType.startsWith("text/"))
@@ -53,6 +64,7 @@ export function installNetworkCapture(configuration, emit) {
         const started = performance.now();
         const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
         const url = input instanceof Request ? input.url : String(input);
+        const capturedUrl = diagnosticUrl(url);
         const captureBodies = configuration.network?.captureTextBodies !== false && !excluded(url, configuration);
         const request = captureBodies ? requestBody(input, init, requestMaximum) : {};
         try {
@@ -62,7 +74,7 @@ export function installNetworkCapture(configuration, emit) {
                 type: "network",
                 offsetMs: Date.now(),
                 method,
-                url,
+                url: capturedUrl,
                 status: response.status,
                 durationMs: Math.round(performance.now() - started),
                 requestBody: request.body,
@@ -80,7 +92,7 @@ export function installNetworkCapture(configuration, emit) {
                 type: "network",
                 offsetMs: Date.now(),
                 method,
-                url,
+                url: capturedUrl,
                 durationMs: Math.round(performance.now() - started),
                 failure: cause instanceof Error ? cause.name : "NetworkError",
             });

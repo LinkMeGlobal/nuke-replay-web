@@ -1,7 +1,7 @@
 import { installNetworkCapture } from "./network";
 import { ReplayPersistence } from "./persistence";
 import { ReplayRingBuffer } from "./ring-buffer";
-const SDK_VERSION = "0.1.2";
+const SDK_VERSION = "0.1.3";
 const PENDING_KEY = "pending-report";
 const MAX_PENDING_AGE = 24 * 60 * 60 * 1_000;
 export class NukeReplayClient {
@@ -15,6 +15,10 @@ export class NukeReplayClient {
     prepared;
     started = false;
     lifecycleEpoch = 0;
+    retryAttempt = 0;
+    retryTimer;
+    retryInFlight;
+    onlineListener;
     constructor(configuration) {
         this.configuration = configuration;
         this.ring = new ReplayRingBuffer((configuration.history?.maxMinutes ?? 30) * 60_000, configuration.history?.maxBytes ?? 75 * 1_024 * 1_024);
@@ -37,16 +41,24 @@ export class NukeReplayClient {
         }) ?? undefined;
         this.cleanupNetwork = installNetworkCapture(this.configuration, (event) => this.ring.addSemantic(event));
         this.cleanupEvents = this.installSemanticEvents();
-        await this.resumePending().catch(() => undefined);
+        this.onlineListener = () => void this.retryPending();
+        window.addEventListener("online", this.onlineListener);
+        void this.retryPending();
     }
     stop() {
         this.lifecycleEpoch += 1;
         this.stopRecorder?.();
         this.cleanupNetwork?.();
         this.cleanupEvents?.();
+        if (this.onlineListener)
+            window.removeEventListener("online", this.onlineListener);
+        if (this.retryTimer)
+            clearTimeout(this.retryTimer);
         this.stopRecorder = undefined;
         this.cleanupNetwork = undefined;
         this.cleanupEvents = undefined;
+        this.onlineListener = undefined;
+        this.retryTimer = undefined;
         this.started = false;
     }
     destroy() {
@@ -119,7 +131,13 @@ export class NukeReplayClient {
         };
         this.prepared = undefined;
         await this.persistence.set(PENDING_KEY, pending);
-        return this.uploadPending(pending);
+        try {
+            return await this.uploadPending(pending);
+        }
+        catch (error) {
+            this.scheduleRetry();
+            throw error;
+        }
     }
     async clearForAccountChange() {
         this.prepared = undefined;
@@ -156,6 +174,35 @@ export class NukeReplayClient {
             return;
         }
         await this.uploadPending(pending);
+    }
+    retryPending() {
+        if (this.retryInFlight)
+            return this.retryInFlight;
+        if (this.retryTimer)
+            clearTimeout(this.retryTimer);
+        this.retryTimer = undefined;
+        this.retryInFlight = this.resumePending()
+            .then(() => {
+            this.retryAttempt = 0;
+        })
+            .catch(() => {
+            this.scheduleRetry();
+        })
+            .finally(() => {
+            this.retryInFlight = undefined;
+        });
+        return this.retryInFlight;
+    }
+    scheduleRetry() {
+        if (!this.started || this.retryTimer)
+            return;
+        const delays = [2_000, 5_000, 15_000, 30_000, 60_000, 300_000];
+        const delay = delays[Math.min(this.retryAttempt, delays.length - 1)] ?? 300_000;
+        this.retryAttempt += 1;
+        this.retryTimer = setTimeout(() => {
+            this.retryTimer = undefined;
+            void this.retryPending();
+        }, delay);
     }
     async uploadPending(pending) {
         this.progress("preparing", 0, 1);
@@ -288,19 +335,23 @@ async function encodeChunks(payload, startedAt) {
     return Promise.all(groups.map(async (events, index) => {
         const firstTimestamp = events[0]?.timestamp ?? startedAt;
         const lastTimestamp = events.at(-1)?.timestamp ?? firstTimestamp;
+        const nextTimestamp = groups[index + 1]?.[0]?.timestamp ?? Number.POSITIVE_INFINITY;
         const semantic = payload.semantic.filter((event) => {
             const absolute = startedAt + event.offsetMs;
-            return absolute >= firstTimestamp && absolute <= lastTimestamp;
+            return (index === 0 || absolute >= firstTimestamp) && absolute < nextTimestamp;
         });
+        const semanticTimestamps = semantic.map((event) => startedAt + event.offsetMs);
+        const chunkStartedAt = Math.min(firstTimestamp, ...semanticTimestamps);
+        const chunkEndedAt = Math.max(lastTimestamp, ...semanticTimestamps);
         const raw = new TextEncoder().encode(JSON.stringify({ events, semantic }));
         const compressed = await compress(raw);
         return {
             bytes: compressed.bytes,
             encoding: compressed.encoding,
             sha256: await sha256(compressed.bytes),
-            startOffsetMs: Math.max(0, firstTimestamp - startedAt),
-            endOffsetMs: Math.max(0, lastTimestamp - startedAt),
-            eventCount: events.length + semantic.length + (index === 0 ? 0 : 0),
+            startOffsetMs: Math.max(0, chunkStartedAt - startedAt),
+            endOffsetMs: Math.max(0, chunkEndedAt - startedAt),
+            eventCount: events.length + semantic.length,
         };
     }));
 }

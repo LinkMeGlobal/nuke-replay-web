@@ -11,6 +11,10 @@ export declare class NukeReplayClient {
     private prepared?;
     private started;
     private lifecycleEpoch;
+    private retryAttempt;
+    private retryTimer?;
+    private retryInFlight?;
+    private onlineListener?;
     constructor(configuration: NukeReplayConfiguration);
     start(): Promise<void>;
     stop(): void;
@@ -34,6 +38,8 @@ export declare class NukeReplayClient {
     private get endpoint();
     private bootstrapRequest;
     private resumePending;
+    private retryPending;
+    private scheduleRetry;
     private uploadPending;
     private installSemanticEvents;
     private semantic;
