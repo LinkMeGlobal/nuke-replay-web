@@ -1,7 +1,17 @@
 {
   "name": "@linkmeglobal/nuke-replay",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
+  "description": "Browser session replay SDK for explicit NUKE bug reports",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LinkMeGlobal/nuke-replay-web.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LinkMeGlobal/nuke-replay-web/issues"
+  },
+  "homepage": "https://github.com/LinkMeGlobal/nuke-replay-web#readme",
   "type": "module",
   "files": ["dist", "README.md", "LICENSE"],
   "exports": {

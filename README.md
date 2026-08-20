@@ -1,8 +1,19 @@
 # NUKE Replay for Web
 
-Private LinkMe SDK for explicit, internal-team bug reports with bounded rrweb
-history, semantic actions, capped text/JSON network diagnostics, offline retry,
-and replay-scoped uploads to `replay.nuke.bio`.
+Open-source browser SDK for explicit NUKE bug reports with bounded rrweb history,
+semantic actions, capped text/JSON network diagnostics, offline retry, and
+replay-scoped uploads to `replay.nuke.bio`.
+
+## Installation
+
+Install the package directly from its tagged GitHub source:
+
+```bash
+bun add 'git+https://github.com/LinkMeGlobal/nuke-replay-web.git#v0.3.1'
+```
+
+The SDK is public, but the NUKE ingestion service is not anonymous. A host must
+provide an authenticated session exchange before capture can be submitted.
 
 Capture is processed continuously rather than when the reporter is submitted:
 
@@ -38,7 +49,7 @@ const replay = createNukeReplay({
 <NukeReplayProvider client={replay}>{children}</NukeReplayProvider>
 ```
 
-The internal pilot intentionally records visible DOM/input state. Add
+The current internal pilot intentionally records visible DOM/input state. Add
 `nuke-replay-block`, `nuke-replay-mask`, or `nuke-replay-ignore` to opt out a
 surface without waiting for the later automatic-masking phase.
 
