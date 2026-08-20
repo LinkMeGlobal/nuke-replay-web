@@ -12,7 +12,15 @@ describe("ReplayRingBuffer", () => {
     buffer.addEvent(event(2_500), true);
     buffer.addEvent(event(2_600), false);
     const selected = buffer.select(30, 2_600);
-    expect(selected.events.map((item) => item.timestamp)).toEqual([2_500, 2_600]);
+    expect(selected.segments.flatMap((segment) => segment.events).map((item) => item.timestamp)).toEqual([2_500, 2_600]);
+  });
+
+  it("evicts old semantic and network data within aggregate budgets", () => {
+    const now = Date.now();
+    const buffer = new ReplayRingBuffer(10_000, 100_000, 100_000, 500, 50);
+    buffer.addEvent(event(now), true);
+    buffer.addSemantic({ type: "network", offsetMs: now, requestBody: "a".repeat(40) });
+    buffer.addSemantic({ type: "network", offsetMs: now + 100, responseBody: "b".repeat(40) });
+    expect(buffer.select(30, now + 100).semantic).toHaveLength(1);
   });
 });
-

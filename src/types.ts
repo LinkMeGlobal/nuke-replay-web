@@ -23,6 +23,9 @@ export interface SessionBootstrap {
   policy: {
     maxChunkBytes: number;
     maxSessionBytes: number;
+    maxAssetBytes?: number;
+    maxAssetTotalBytes?: number;
+    maxAssetCount?: number;
     maxDurationMs: number;
     retentionDays: number;
   };
@@ -68,6 +71,12 @@ export interface NukeReplayConfiguration {
   createSession: (request: SessionBootstrapRequest) => Promise<SessionBootstrap>;
   submitDiagnostics?: (report: ReplayReportInput) => Promise<ReplaySubmitResult>;
   history?: { maxMinutes?: number; maxBytes?: number };
+  budgets?: {
+    domBytes?: number;
+    imageBytes?: number;
+    semanticBytes?: number;
+    networkBodyBytes?: number;
+  };
   network?: {
     captureTextBodies?: boolean;
     requestBodyBytes?: number;
@@ -76,10 +85,30 @@ export interface NukeReplayConfiguration {
   };
   triggers?: { edgeLauncher?: boolean; keyboardShortcut?: boolean };
   onProgress?: (progress: ReplayProgress) => void;
+  onTelemetry?: (timing: ReplayTiming) => void;
 }
 
 export interface ReplayProgress {
-  phase: "preparing" | "uploading" | "submitting" | "pending" | "complete";
+  phase: "preparing" | "uploading" | "processing" | "complete" | "failed";
   completed: number;
   total: number;
+  bytesUploaded: number;
+  bytesTotal: number;
+  reference?: string;
+  message?: string;
+}
+
+export interface ReplayTiming {
+  phase:
+    | "indexeddb"
+    | "serialization"
+    | "gzip"
+    | "hashing"
+    | "session"
+    | "report"
+    | "network"
+    | "completion";
+  durationMs: number;
+  bytes?: number;
+  chunkSequence?: number;
 }

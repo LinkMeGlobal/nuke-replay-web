@@ -1,10 +1,18 @@
-import type { NukeReplayConfiguration, ReplayProject, ReplayReportInput, ReplaySubmitResult } from "./types";
+import type { NukeReplayConfiguration, ReplayProgress, ReplayProject, ReplayReportInput, ReplaySubmitResult } from "./types";
 type OpenListener = (open: boolean) => void;
+type ProgressListener = (progress: ReplayProgress | null) => void;
 export declare class NukeReplayClient {
     readonly configuration: NukeReplayConfiguration;
     private readonly ring;
     private readonly persistence;
+    private readonly encoder;
     private readonly listeners;
+    private readonly progressListeners;
+    private readonly sealedSegmentIds;
+    private readonly segmentJobs;
+    private readonly recentTimings;
+    private readonly assetCache;
+    private activeTimings?;
     private stopRecorder?;
     private cleanupNetwork?;
     private cleanupEvents?;
@@ -15,6 +23,7 @@ export declare class NukeReplayClient {
     private retryTimer?;
     private retryInFlight?;
     private onlineListener?;
+    private submissionActive;
     constructor(configuration: NukeReplayConfiguration);
     start(): Promise<void>;
     stop(): void;
@@ -22,6 +31,7 @@ export declare class NukeReplayClient {
     openReporter(): void;
     closeReporter(): void;
     subscribe(listener: OpenListener): () => void;
+    subscribeProgress(listener: ProgressListener): () => void;
     setContext(input: {
         route?: string;
     }): void;
@@ -37,13 +47,32 @@ export declare class NukeReplayClient {
     get defaultProjectId(): string;
     private get endpoint();
     private bootstrapRequest;
+    private ensurePrepared;
+    private createReport;
+    private persistAndUpload;
+    private startBackgroundUpload;
     private resumePending;
+    private migrateLegacyPending;
     private retryPending;
     private scheduleRetry;
     private uploadPending;
+    private prepareUpload;
+    private negotiateAssets;
+    private uploadAsset;
+    private uploadChunk;
+    private recordEvent;
+    private addSemantic;
+    private removeEvictedSegments;
+    private persistCaptureSegment;
+    private resolveCaptureSegment;
+    private encodeSegment;
+    private assetOptions;
+    private resolveAssets;
     private installSemanticEvents;
     private semantic;
     private progress;
+    private telemetry;
+    private timed;
 }
 export declare function createNukeReplay(configuration: NukeReplayConfiguration): NukeReplayClient;
 export {};
