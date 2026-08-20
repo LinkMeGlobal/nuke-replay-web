@@ -10,6 +10,7 @@ export declare class NukeReplayClient {
     private cleanupEvents?;
     private prepared?;
     private started;
+    private lifecycleEpoch;
     constructor(configuration: NukeReplayConfiguration);
     start(): Promise<void>;
     stop(): void;

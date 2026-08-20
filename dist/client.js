@@ -1,7 +1,7 @@
 import { installNetworkCapture } from "./network";
 import { ReplayPersistence } from "./persistence";
 import { ReplayRingBuffer } from "./ring-buffer";
-const SDK_VERSION = "0.1.0";
+const SDK_VERSION = "0.1.2";
 const PENDING_KEY = "pending-report";
 const MAX_PENDING_AGE = 24 * 60 * 60 * 1_000;
 export class NukeReplayClient {
@@ -14,6 +14,7 @@ export class NukeReplayClient {
     cleanupEvents;
     prepared;
     started = false;
+    lifecycleEpoch = 0;
     constructor(configuration) {
         this.configuration = configuration;
         this.ring = new ReplayRingBuffer((configuration.history?.maxMinutes ?? 30) * 60_000, configuration.history?.maxBytes ?? 75 * 1_024 * 1_024);
@@ -22,7 +23,10 @@ export class NukeReplayClient {
         if (this.started || typeof window === "undefined")
             return;
         this.started = true;
+        const epoch = ++this.lifecycleEpoch;
         const { record } = await import("rrweb");
+        if (!this.started || epoch !== this.lifecycleEpoch)
+            return;
         this.stopRecorder = record({
             emit: (event, checkout) => this.ring.addEvent(event, checkout ?? false),
             checkoutEveryNms: 60_000,
@@ -36,9 +40,13 @@ export class NukeReplayClient {
         await this.resumePending().catch(() => undefined);
     }
     stop() {
+        this.lifecycleEpoch += 1;
         this.stopRecorder?.();
         this.cleanupNetwork?.();
         this.cleanupEvents?.();
+        this.stopRecorder = undefined;
+        this.cleanupNetwork = undefined;
+        this.cleanupEvents = undefined;
         this.started = false;
     }
     destroy() {
@@ -250,6 +258,8 @@ export class NukeReplayClient {
         };
     }
     semantic(event) {
+        if (!this.started)
+            return;
         this.ring.addSemantic({ ...event, offsetMs: Date.now() });
     }
     progress(phase, completed, total) {

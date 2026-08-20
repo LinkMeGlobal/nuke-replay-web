@@ -13,7 +13,7 @@ import type {
   SessionBootstrapRequest,
 } from "./types";
 
-const SDK_VERSION = "0.1.0";
+const SDK_VERSION = "0.1.2";
 const PENDING_KEY = "pending-report";
 const MAX_PENDING_AGE = 24 * 60 * 60 * 1_000;
 
@@ -46,6 +46,7 @@ export class NukeReplayClient {
   private cleanupEvents?: () => void;
   private prepared?: { idempotencyKey: string; bootstrap: SessionBootstrap; startedAt: number };
   private started = false;
+  private lifecycleEpoch = 0;
 
   constructor(readonly configuration: NukeReplayConfiguration) {
     this.ring = new ReplayRingBuffer(
@@ -57,7 +58,9 @@ export class NukeReplayClient {
   async start(): Promise<void> {
     if (this.started || typeof window === "undefined") return;
     this.started = true;
+    const epoch = ++this.lifecycleEpoch;
     const { record } = await import("rrweb");
+    if (!this.started || epoch !== this.lifecycleEpoch) return;
     this.stopRecorder = record({
       emit: (event, checkout) => this.ring.addEvent(event, checkout ?? false),
       checkoutEveryNms: 60_000,
@@ -72,9 +75,13 @@ export class NukeReplayClient {
   }
 
   stop(): void {
+    this.lifecycleEpoch += 1;
     this.stopRecorder?.();
     this.cleanupNetwork?.();
     this.cleanupEvents?.();
+    this.stopRecorder = undefined;
+    this.cleanupNetwork = undefined;
+    this.cleanupEvents = undefined;
     this.started = false;
   }
 
@@ -305,6 +312,7 @@ export class NukeReplayClient {
   private semantic(
     event: Omit<SemanticEvent, "offsetMs"> & { type: SemanticEvent["type"] },
   ): void {
+    if (!this.started) return;
     this.ring.addSemantic({ ...event, offsetMs: Date.now() });
   }
 
