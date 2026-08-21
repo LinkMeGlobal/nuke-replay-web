@@ -111,7 +111,12 @@ export class NukeReplayClient {
       maskTextClass: "nuke-replay-mask",
       ignoreClass: "nuke-replay-ignore",
       inlineStylesheet: true,
-      inlineImages: true,
+      // rrweb's inline-image path mutates live cross-origin <img> elements by
+      // toggling `crossOrigin` after load. That can reload or blank the image
+      // when a CDN does not allow the current app origin. Replay assets are
+      // captured separately by the segment encoder, so DOM mutation is both
+      // unnecessary and unsafe here.
+      inlineImages: false,
       collectFonts: true,
       dataURLOptions: { type: "image/webp", quality: 0.82 },
       recordCanvas: false,

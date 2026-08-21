@@ -1,13 +1,15 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, } from "react";
 const ReplayContext = createContext(null);
-export function NukeReplayProvider({ client, children, launcher = true, shortcut = true, }) {
+export function NukeReplayProvider({ client, children, enabled = true, launcher = true, shortcut = true, }) {
     const [open, setOpen] = useState(false);
     const [progress, setProgress] = useState(null);
     useEffect(() => {
+        if (!enabled)
+            return;
         void client.start();
         return () => client.stop();
-    }, [client]);
+    }, [client, enabled]);
     useEffect(() => client.subscribe(setOpen), [client]);
     useEffect(() => client.subscribeProgress(setProgress), [client]);
     useEffect(() => {

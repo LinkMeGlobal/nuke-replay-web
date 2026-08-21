@@ -16,6 +16,7 @@ const ReplayContext = createContext<NukeReplayClient | null>(null);
 export interface NukeReplayProviderProps {
   client: NukeReplayClient;
   children: ReactNode;
+  enabled?: boolean;
   launcher?: boolean;
   shortcut?: boolean;
 }
@@ -23,6 +24,7 @@ export interface NukeReplayProviderProps {
 export function NukeReplayProvider({
   client,
   children,
+  enabled = true,
   launcher = true,
   shortcut = true,
 }: NukeReplayProviderProps) {
@@ -30,9 +32,10 @@ export function NukeReplayProvider({
   const [progress, setProgress] = useState<ReplayProgress | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     void client.start();
     return () => client.stop();
-  }, [client]);
+  }, [client, enabled]);
 
   useEffect(() => client.subscribe(setOpen), [client]);
   useEffect(() => client.subscribeProgress(setProgress), [client]);
